@@ -1,0 +1,251 @@
+===== q01_customer_statement (before) =====
+-- Q1: 12-month statement for one customer (OLTP point query on the largest table)
+SELECT txn_date, txn_type, contribution_source, amount, balance_after
+FROM account_transaction
+WHERE customer_id = :cid AND txn_date >= CURRENT_DATE - INTERVAL '12 months'
+ORDER BY txn_date DESC, txn_id DESC;
+
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Gather Merge  (cost=13739.65..13742.21 rows=22 width=36) (actual time=196.637..207.063 rows=6.00 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   Buffers: shared hit=5579 read=2557
+   ->  Sort  (cost=12739.63..12739.65 rows=9 width=36) (actual time=91.873..91.875 rows=2.00 loops=3)
+         Sort Key: txn_date DESC, txn_id DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=5579 read=2557
+         Worker 0:  Sort Method: quicksort  Memory: 25kB
+         Worker 1:  Sort Method: quicksort  Memory: 25kB
+         ->  Parallel Seq Scan on account_transaction  (cost=0.00..12739.48 rows=9 width=36) (actual time=84.228..91.739 rows=2.00 loops=3)
+               Filter: ((customer_id = 923) AND (txn_date >= (CURRENT_DATE - '1 year'::interval)))
+               Rows Removed by Filter: 187737
+               Buffers: shared hit=5489 read=2557
+ Planning:
+   Buffers: shared hit=132
+ Planning Time: 3.811 ms
+ Execution Time: 207.223 ms
+(18 rows)
+
+===== q02_employer_remittance (before) =====
+-- Q2: monthly remittance schedule for one employer over the last 12 months
+SELECT e.employer_name, date_trunc('month', t.txn_date)::date AS month, SUM(t.amount) AS total_contributions, COUNT(*) AS postings
+FROM account_transaction t
+JOIN employer e USING (employer_id)
+WHERE t.employer_id = :emp AND t.txn_type = 'CONTRIBUTION' AND t.txn_date >= CURRENT_DATE - INTERVAL '12 months'
+GROUP BY e.employer_name, date_trunc('month', t.txn_date)
+ORDER BY month;
+
+                                                                                 QUERY PLAN                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=14497.17..14497.26 rows=35 width=80) (actual time=173.815..187.489 rows=12.00 loops=1)
+   Sort Key: (((date_trunc('month'::text, (t.txn_date)::timestamp with time zone)))::date)
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=5715 read=2369
+   ->  Finalize GroupAggregate  (cost=14484.57..14496.27 rows=35 width=80) (actual time=173.751..187.442 rows=12.00 loops=1)
+         Group Key: e.employer_name, (date_trunc('month'::text, (t.txn_date)::timestamp with time zone))
+         Buffers: shared hit=5712 read=2369
+         ->  Gather Merge  (cost=14484.57..14494.35 rows=84 width=80) (actual time=173.740..187.417 rows=19.00 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=5712 read=2369
+               ->  Sort  (cost=13484.54..13484.63 rows=35 width=80) (actual time=68.285..68.287 rows=6.33 loops=3)
+                     Sort Key: e.employer_name, (date_trunc('month'::text, (t.txn_date)::timestamp with time zone))
+                     Sort Method: quicksort  Memory: 26kB
+                     Buffers: shared hit=5712 read=2369
+                     Worker 0:  Sort Method: quicksort  Memory: 25kB
+                     Worker 1:  Sort Method: quicksort  Memory: 25kB
+                     ->  Partial HashAggregate  (cost=13483.03..13483.64 rows=35 width=80) (actual time=68.198..68.203 rows=6.33 loops=3)
+                           Group Key: e.employer_name, date_trunc('month'::text, (t.txn_date)::timestamp with time zone)
+                           Batches: 1  Memory Usage: 32kB
+                           Buffers: shared hit=5680 read=2369
+                           Worker 0:  Batches: 1  Memory Usage: 32kB
+                           Worker 1:  Batches: 1  Memory Usage: 32kB
+                           ->  Nested Loop  (cost=0.00..13426.49 rows=5654 width=48) (actual time=21.161..64.333 rows=4600.00 loops=3)
+                                 Buffers: shared hit=5680 read=2369
+                                 ->  Parallel Seq Scan on account_transaction t  (cost=0.00..13326.17 rows=5654 width=16) (actual time=20.438..58.286 rows=4600.00 loops=3)
+                                       Filter: ((employer_id = 5) AND (txn_type = 'CONTRIBUTION'::txn_type) AND (txn_date >= (CURRENT_DATE - '1 year'::interval)))
+                                       Rows Removed by Filter: 183139
+                                       Buffers: shared hit=5677 read=2369
+                                 ->  Materialize  (cost=0.00..1.38 rows=1 width=32) (actual time=0.000..0.000 rows=1.00 loops=13800)
+                                       Storage: Memory  Maximum Storage: 17kB
+                                       Buffers: shared hit=3
+                                       ->  Seq Scan on employer e  (cost=0.00..1.38 rows=1 width=32) (actual time=0.614..0.619 rows=1.00 loops=3)
+                                             Filter: (employer_id = 5)
+                                             Rows Removed by Filter: 29
+                                             Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=214
+ Planning Time: 4.082 ms
+ Execution Time: 187.804 ms
+(40 rows)
+
+===== q03_company_monthly_contributions (before) =====
+-- Q3: company-wide monthly contributions per employer (heavy aggregation over the whole ledger)
+SELECT e.employer_name, date_trunc('month', t.txn_date)::date AS month, SUM(t.amount) AS total_contributions
+FROM account_transaction t
+JOIN employer e USING (employer_id)
+WHERE t.txn_type = 'CONTRIBUTION'
+GROUP BY e.employer_name, date_trunc('month', t.txn_date)
+ORDER BY e.employer_name, month;
+
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=15686.14..16059.34 rows=1050 width=72) (actual time=287.219..301.219 rows=1017.00 loops=1)
+   Sort Key: e.employer_name, (((date_trunc('month'::text, (t.txn_date)::timestamp with time zone)))::date)
+   Presorted Key: e.employer_name
+   Full-sort Groups: 30  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+   Buffers: shared hit=5997 read=2087
+   ->  Finalize GroupAggregate  (cost=15673.74..16018.69 rows=1050 width=72) (actual time=287.120..300.909 rows=1017.00 loops=1)
+         Group Key: e.employer_name, (date_trunc('month'::text, (t.txn_date)::timestamp with time zone))
+         Buffers: shared hit=5994 read=2087
+         ->  Gather Merge  (cost=15673.74..15967.24 rows=2520 width=72) (actual time=287.106..299.816 rows=2097.00 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               Buffers: shared hit=5994 read=2087
+               ->  Sort  (cost=14673.72..14676.35 rows=1050 width=72) (actual time=208.160..208.203 rows=699.00 loops=3)
+                     Sort Key: e.employer_name, (date_trunc('month'::text, (t.txn_date)::timestamp with time zone))
+                     Sort Method: quicksort  Memory: 151kB
+                     Buffers: shared hit=5994 read=2087
+                     Worker 0:  Sort Method: quicksort  Memory: 88kB
+                     Worker 1:  Sort Method: quicksort  Memory: 95kB
+                     ->  Partial HashAggregate  (cost=14602.66..14621.03 rows=1050 width=72) (actual time=206.042..206.414 rows=699.00 loops=3)
+                           Group Key: e.employer_name, date_trunc('month'::text, (t.txn_date)::timestamp with time zone)
+                           Batches: 1  Memory Usage: 689kB
+                           Buffers: shared hit=5962 read=2087
+                           Worker 0:  Batches: 1  Memory Usage: 369kB
+                           Worker 1:  Batches: 1  Memory Usage: 369kB
+                           ->  Hash Join  (cost=1.68..12849.05 rows=233814 width=48) (actual time=1.291..135.859 rows=184145.33 loops=3)
+                                 Hash Cond: (t.employer_id = e.employer_id)
+                                 Buffers: shared hit=5962 read=2087
+                                 ->  Parallel Seq Scan on account_transaction t  (cost=0.00..10979.43 rows=233814 width=16) (actual time=0.747..47.580 rows=187038.00 loops=3)
+                                       Filter: (txn_type = 'CONTRIBUTION'::txn_type)
+                                       Rows Removed by Filter: 701
+                                       Buffers: shared hit=5959 read=2087
+                                 ->  Hash  (cost=1.30..1.30 rows=30 width=32) (actual time=0.492..0.493 rows=30.00 loops=3)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                                       Buffers: shared hit=3
+                                       ->  Seq Scan on employer e  (cost=0.00..1.30 rows=30 width=32) (actual time=0.460..0.465 rows=30.00 loops=3)
+                                             Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=293
+ Planning Time: 3.049 ms
+ Execution Time: 301.585 ms
+(40 rows)
+
+===== q04_search_by_phone (before) =====
+-- Q4: call-centre lookup by phone number
+SELECT customer_id, surname, first_name, status, current_balance
+FROM customer
+WHERE phone_number = :phone;
+
+                                               QUERY PLAN                                                
+---------------------------------------------------------------------------------------------------------
+ Seq Scan on customer  (cost=0.00..1171.00 rows=1 width=32) (actual time=1.257..4.751 rows=1.00 loops=1)
+   Filter: ((phone_number)::text = '08139772046'::text)
+   Rows Removed by Filter: 19999
+   Buffers: shared hit=921
+ Planning:
+   Buffers: shared hit=108
+ Planning Time: 1.676 ms
+ Execution Time: 4.887 ms
+(8 rows)
+
+===== q05_surname_search (before) =====
+-- Q5: partial-name search (ILIKE '%...%' cannot use a B-tree; trigram GIN can)
+SELECT customer_id, surname, first_name
+FROM customer
+WHERE surname ILIKE '%zekwes%' AND first_name = 'Tunde';
+
+                                                 QUERY PLAN                                                 
+------------------------------------------------------------------------------------------------------------
+ Seq Scan on customer  (cost=0.00..1221.00 rows=21 width=20) (actual time=1.870..14.996 rows=23.00 loops=1)
+   Filter: (((surname)::text ~~* '%zekwes%'::text) AND ((first_name)::text = 'Tunde'::text))
+   Rows Removed by Filter: 19977
+   Buffers: shared hit=921
+ Planning:
+   Buffers: shared hit=99
+ Planning Time: 3.048 ms
+ Execution Time: 15.115 ms
+(8 rows)
+
+===== q06_pending_benefits (before) =====
+-- Q6: work queue - oldest pending benefit applications from the last 30 days with customer and employer
+SELECT ba.benefit_id, ba.benefit_type, ba.application_date, ba.amount_requested, c.surname, c.first_name, e.employer_name
+FROM benefit_application ba
+JOIN customer c USING (customer_id)
+JOIN employer e USING (employer_id)
+WHERE ba.status = 'PENDING' AND ba.application_date >= CURRENT_DATE - INTERVAL '30 days'
+ORDER BY ba.application_date
+LIMIT 50;
+
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1314.72..1314.85 rows=50 width=64) (actual time=2.551..2.560 rows=50.00 loops=1)
+   Buffers: shared hit=720
+   ->  Sort  (cost=1314.72..1315.17 rows=178 width=64) (actual time=2.550..2.556 rows=50.00 loops=1)
+         Sort Key: ba.application_date
+         Sort Method: top-N heapsort  Memory: 35kB
+         Buffers: shared hit=720
+         ->  Nested Loop  (cost=0.43..1308.81 rows=178 width=64) (actual time=0.092..2.427 rows=178.00 loops=1)
+               Buffers: shared hit=717
+               ->  Nested Loop  (cost=0.29..1299.67 rows=178 width=40) (actual time=0.064..2.263 rows=178.00 loops=1)
+                     Buffers: shared hit=657
+                     ->  Seq Scan on benefit_application ba  (cost=0.00..193.38 rows=178 width=32) (actual time=0.039..1.051 rows=178.00 loops=1)
+                           Filter: ((status = 'PENDING'::benefit_status) AND (application_date >= (CURRENT_DATE - '30 days'::interval)))
+                           Rows Removed by Filter: 3341
+                           Buffers: shared hit=123
+                     ->  Index Scan using customer_pkey on customer c  (cost=0.29..6.22 rows=1 width=24) (actual time=0.006..0.006 rows=1.00 loops=178)
+                           Index Cond: (customer_id = ba.customer_id)
+                           Index Searches: 178
+                           Buffers: shared hit=534
+               ->  Memoize  (cost=0.15..0.17 rows=1 width=32) (actual time=0.001..0.001 rows=1.00 loops=178)
+                     Cache Key: c.employer_id
+                     Cache Mode: logical
+                     Hits: 148  Misses: 30  Evictions: 0  Overflows: 0  Memory Usage: 4kB
+                     Buffers: shared hit=60
+                     ->  Index Scan using employer_pkey on employer e  (cost=0.14..0.16 rows=1 width=32) (actual time=0.001..0.001 rows=1.00 loops=30)
+                           Index Cond: (employer_id = c.employer_id)
+                           Index Searches: 30
+                           Buffers: shared hit=60
+ Planning:
+   Buffers: shared hit=440
+ Planning Time: 5.270 ms
+ Execution Time: 2.668 ms
+(31 rows)
+
+===== q07_top_balances_per_fund (before) =====
+-- Q7: top 5 balances in every fund (window function)
+SELECT fund_type_id, customer_id, current_balance, rnk FROM (
+  SELECT fund_type_id, customer_id, current_balance,
+         ROW_NUMBER() OVER (PARTITION BY fund_type_id ORDER BY current_balance DESC) AS rnk
+  FROM customer WHERE status = 'ACTIVE'
+) x WHERE rnk <= 5
+ORDER BY fund_type_id, rnk;
+
+                                                            QUERY PLAN                                                             
+-----------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=2629.09..3908.08 rows=16959 width=26) (actual time=31.403..31.406 rows=20.00 loops=1)
+   Sort Key: customer.fund_type_id, (row_number() OVER w1)
+   Presorted Key: customer.fund_type_id
+   Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 26kB  Peak Memory: 26kB
+   Buffers: shared hit=930
+   ->  WindowAgg  (cost=2362.37..2701.53 rows=16959 width=26) (actual time=29.148..31.355 rows=20.00 loops=1)
+         Window: w1 AS (PARTITION BY customer.fund_type_id ORDER BY customer.current_balance ROWS UNBOUNDED PRECEDING)
+         Run Condition: (row_number() OVER w1 <= 5)
+         Storage: Memory  Maximum Storage: 17kB
+         Buffers: shared hit=924
+         ->  Sort  (cost=2362.35..2404.75 rows=16959 width=18) (actual time=29.113..30.146 rows=16959.00 loops=1)
+               Sort Key: customer.fund_type_id, customer.current_balance DESC
+               Sort Method: quicksort  Memory: 1431kB
+               Buffers: shared hit=924
+               ->  Seq Scan on customer  (cost=0.00..1171.00 rows=16959 width=18) (actual time=0.040..7.654 rows=16959.00 loops=1)
+                     Filter: (status = 'ACTIVE'::customer_status)
+                     Rows Removed by Filter: 3041
+                     Buffers: shared hit=921
+ Planning:
+   Buffers: shared hit=146
+ Planning Time: 3.691 ms
+ Execution Time: 31.756 ms
+(22 rows)
+

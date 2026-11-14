@@ -1,0 +1,78 @@
+digraph ER {
+  graph [rankdir=LR, fontname="Helvetica", nodesep=0.5, ranksep=1.0, pad=0.3, labelloc=t, fontsize=18,
+         label="Access Pensions Limited - Entity Relationship Diagram (schema ap)"];
+  node  [shape=plaintext, fontname="Helvetica", fontsize=10];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  customer [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#1F3A5F"><FONT COLOR="white"><B>customer</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK customer_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">pension_pin (UNIQUE)</TD></TR>
+    <TR><TD ALIGN="LEFT">surname, first_name, other_names</TD></TR>
+    <TR><TD ALIGN="LEFT">date_of_birth, gender</TD></TR>
+    <TR><TD ALIGN="LEFT">phone_number, email</TD></TR>
+    <TR><TD ALIGN="LEFT">account_created_on, denomination</TD></TR>
+    <TR><TD ALIGN="LEFT">FK fund_type_id</TD></TR>
+    <TR><TD ALIGN="LEFT">FK employer_id</TD></TR>
+    <TR><TD ALIGN="LEFT">FK bank_id, bank_account_no</TD></TR>
+    <TR><TD ALIGN="LEFT">status, current_balance</TD></TR></TABLE>>];
+
+  fund_type [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#5B7DB1"><FONT COLOR="white"><B>fund_type</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK fund_type_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">fund_code (UNIQUE), fund_name, risk_profile</TD></TR></TABLE>>];
+
+  employer [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#5B7DB1"><FONT COLOR="white"><B>employer</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK employer_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">employer_name (UNIQUE), sector</TD></TR></TABLE>>];
+
+  bank [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#5B7DB1"><FONT COLOR="white"><B>bank</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK bank_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">bank_name (UNIQUE)</TD></TR></TABLE>>];
+
+  next_of_kin [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#5B7DB1"><FONT COLOR="white"><B>next_of_kin</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK nok_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">FK customer_id</TD></TR>
+    <TR><TD ALIGN="LEFT">full_name, relationship, phone_number</TD></TR>
+    <TR><TD ALIGN="LEFT">share_percent</TD></TR></TABLE>>];
+
+  account_transaction [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#2E7D5B"><FONT COLOR="white"><B>account_transaction (ledger)</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK txn_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">FK customer_id</TD></TR>
+    <TR><TD ALIGN="LEFT">txn_type (CONTRIBUTION | PAYMENT)</TD></TR>
+    <TR><TD ALIGN="LEFT">contribution_source, amount, txn_date</TD></TR>
+    <TR><TD ALIGN="LEFT">FK employer_id (contributions)</TD></TR>
+    <TR><TD ALIGN="LEFT">FK benefit_id (payments)</TD></TR>
+    <TR><TD ALIGN="LEFT">reference (UNIQUE), balance_after</TD></TR></TABLE>>];
+
+  benefit_application [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#B5651D"><FONT COLOR="white"><B>benefit_application</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK benefit_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">FK customer_id</TD></TR>
+    <TR><TD ALIGN="LEFT">benefit_type (25% | equity mortgage |</TD></TR>
+    <TR><TD ALIGN="LEFT">lump sum | voluntary | death benefit)</TD></TR>
+    <TR><TD ALIGN="LEFT">application_date, amount_requested</TD></TR>
+    <TR><TD ALIGN="LEFT">amount_approved, status</TD></TR>
+    <TR><TD ALIGN="LEFT">decision_date, decided_by, rejection_reason</TD></TR></TABLE>>];
+
+  audit_log [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD BGCOLOR="#777777"><FONT COLOR="white"><B>audit_log</B></FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>PK audit_id</B></TD></TR>
+    <TR><TD ALIGN="LEFT">table_name, record_pk, action</TD></TR>
+    <TR><TD ALIGN="LEFT">old_data, new_data (JSONB)</TD></TR>
+    <TR><TD ALIGN="LEFT">changed_by, changed_at</TD></TR></TABLE>>];
+
+  fund_type -> customer   [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  employer  -> customer   [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  bank      -> customer   [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  customer  -> next_of_kin [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  customer  -> account_transaction [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  customer  -> benefit_application [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee];
+  benefit_application -> account_transaction [label="1 : 0..N payments", arrowhead=crow, dir=both, arrowtail=tee];
+  employer  -> account_transaction [label="1 : N", arrowhead=crow, dir=both, arrowtail=tee, style=dashed];
+  benefit_application -> audit_log [label="audited by trigger", style=dotted, arrowhead=none];
+}

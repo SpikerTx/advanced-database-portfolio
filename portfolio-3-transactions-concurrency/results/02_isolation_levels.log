@@ -1,0 +1,36 @@
+=== Isolation level: READ COMMITTED ===
+[S2]          step          
+[S2] -----------------------
+[S2]  S2 committed +250,000
+[S2] 
+[S1]       step      |  balance   
+[S1] ----------------+------------
+[S1]  S1 first read  | 1000000.00
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S1]       step      |  balance   
+[S1] ----------------+------------
+[S1]  S1 second read | 1250000.00
+[S1] 
+
+=== Isolation level: REPEATABLE READ ===
+[S2]          step          
+[S2] -----------------------
+[S2]  S2 committed +250,000
+[S2] 
+[S1]       step      |  balance   
+[S1] ----------------+------------
+[S1]  S1 first read  | 1000000.00
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S1]       step      |  balance   
+[S1] ----------------+------------
+[S1]  S1 second read | 1000000.00
+[S1] 
+

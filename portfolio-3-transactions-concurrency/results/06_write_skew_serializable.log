@@ -1,0 +1,49 @@
+=== REPEATABLE READ ===
+[S1]                        step                        | count 
+[S1] ---------------------------------------------------+-------
+[S1]  S1 rule check: open applications for customer 7 = |     0
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S2]                        step                        | count 
+[S2] ---------------------------------------------------+-------
+[S2]  S2 rule check: open applications for customer 7 = |     0
+[S2] 
+[S2]  pg_sleep 
+[S2] ----------
+[S2]  
+[S2] 
+[RESULT]                    note                   | count 
+[RESULT] ------------------------------------------+-------
+[RESULT]  RESULT: open applications for customer 7 |     2
+[RESULT] (1 row)
+[RESULT] 
+
+=== SERIALIZABLE ===
+[S1]                        step                        | count 
+[S1] ---------------------------------------------------+-------
+[S1]  S1 rule check: open applications for customer 7 = |     0
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S2]                        step                        | count 
+[S2] ---------------------------------------------------+-------
+[S2]  S2 rule check: open applications for customer 7 = |     0
+[S2] 
+[S2]  pg_sleep 
+[S2] ----------
+[S2]  
+[S2] 
+[S2] ERROR:  could not serialize access due to read/write dependencies among transactions
+[S2] DETAIL:  Reason code: Canceled on identification as a pivot, during write.
+[S2] HINT:  The transaction might succeed if retried.
+[RESULT]                    note                   | count 
+[RESULT] ------------------------------------------+-------
+[RESULT]  RESULT: open applications for customer 7 |     1
+[RESULT] (1 row)
+[RESULT] 
+

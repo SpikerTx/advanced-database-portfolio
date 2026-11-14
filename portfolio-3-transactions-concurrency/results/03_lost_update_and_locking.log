@@ -1,0 +1,41 @@
+=== NAIVE: both sessions read 1,000,000 then write back 'value read + deposit' ===
+[S2]   step   |  balance   
+[S2] ---------+------------
+[S2]  S2 read | 1000000.00
+[S2] 
+[S1]   step   |  balance   
+[S1] ---------+------------
+[S1]  S1 read | 1000000.00
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[RESULT]             note             |  balance   
+[RESULT] -----------------------------+------------
+[RESULT]  RESULT (expected 1,300,000) | 1100000.00
+[RESULT] (1 row)
+[RESULT] 
+
+=== SAFE: SELECT ... FOR UPDATE serialises the two deposits ===
+[S1]      step      |  balance   
+[S1] ---------------+------------
+[S1]  S1 locked row | 1000000.00
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S2]           step          
+[S2] ------------------------
+[S2]  S2 waiting for lock...
+[S2] 
+[S2]        step        |  balance   
+[S2] -------------------+------------
+[S2]  S2 got lock, sees | 1100000.00
+[S2] 
+[RESULT]             note             |  balance   
+[RESULT] -----------------------------+------------
+[RESULT]  RESULT (expected 1,300,000) | 1300000.00
+[RESULT] (1 row)
+[RESULT] 

@@ -1,0 +1,22 @@
+[S1]       step      
+[S1] ----------------
+[S1]  S1 holds row 1
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S1] ERROR:  deadlock detected
+[S1] DETAIL:  Process 14892 waits for ShareLock on transaction 1151; blocked by process 3128.
+[S1] Process 3128 waits for ShareLock on transaction 1150; blocked by process 14892.
+[S1] HINT:  See server log for query details.
+[S1] CONTEXT:  while updating tuple (0,2) in relation "account"
+[S2]       step      
+[S2] ----------------
+[S2]  S2 holds row 2
+[S2] 
+[S2]  pg_sleep 
+[S2] ----------
+[S2]  
+[S2] 
+Mitigation: always lock rows in a consistent order (e.g. ORDER BY id) - see README.

@@ -1,0 +1,34 @@
+Customer 24 has balance 551654.88
+Benefit 3524 and 3525 approved for 330992.93 each. Now paying both concurrently...
+[S1]           step          | txn_id 
+[S1] ------------------------+--------
+[S1]  S1 paying benefit 3524 | 563230
+[S1] 
+[S1]  pg_sleep 
+[S1] ----------
+[S1]  
+[S1] 
+[S2]                    step                    
+[S2] -------------------------------------------
+[S2]  S2 paying benefit 3525 (will wait for S1)
+[S2] 
+[S2] Time: 0.544 ms
+[S2] ERROR:  Insufficient balance: requested 330992.93, available 220661.95 (customer 24)
+[S2] CONTEXT:  PL/pgSQL function fn_post_transaction() line 22 at RAISE
+[S2] SQL statement "INSERT INTO account_transaction (customer_id, txn_type, amount, txn_date, benefit_id, reference)
+[S2]     VALUES (b.customer_id, 'PAYMENT', b.amount_approved, CURRENT_DATE, b.benefit_id,
+[S2]             'PAY-' || lpad(b.benefit_id::text, 10, '0'))
+[S2]     RETURNING txn_id"
+[S2] PL/pgSQL function pay_benefit(bigint) line 8 at SQL statement
+[S2] Time: 1816.301 ms (00:01.816)
+[RESULT]  benefit_id |  status  
+[RESULT] ------------+----------
+[RESULT]        3524 | PAID
+[RESULT]        3525 | APPROVED
+[RESULT] (2 rows)
+[RESULT] 
+[RESULT]  current_balance 
+[RESULT] -----------------
+[RESULT]        220661.95
+[RESULT] (1 row)
+[RESULT] 

@@ -1,7 +1,9 @@
 -- Demo 1 | Atomicity: COMMIT, ROLLBACK, SAVEPOINT and a failed (rolled-back) overdraft
+-- Re-runnable: every posting reference carries a unique run number.
 \set ON_ERROR_STOP off
 SET search_path = ap, public;
 \pset pager off
+SELECT (extract(epoch FROM clock_timestamp()))::bigint AS run \gset
 SELECT customer_id AS cid, current_balance AS start_balance FROM customer
  WHERE status = 'ACTIVE' AND current_balance > 100000 ORDER BY customer_id LIMIT 1 \gset
 \echo '--- Customer' :cid 'opening balance' :start_balance
@@ -9,14 +11,14 @@ SELECT customer_id AS cid, current_balance AS start_balance FROM customer
 \echo '--- A) COMMIT: post a voluntary contribution of 50,000'
 BEGIN;
 INSERT INTO account_transaction (customer_id, txn_type, contribution_source, amount, reference)
-VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 50000, 'DEMO-C-' || :cid);
+VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 50000, 'DEMO-C-' || :cid || '-' || :run);
 SELECT current_balance FROM customer WHERE customer_id = :cid;
 COMMIT;
 
 \echo '--- B) ROLLBACK: post 75,000 then change our mind -> balance unchanged'
 BEGIN;
 INSERT INTO account_transaction (customer_id, txn_type, contribution_source, amount, reference)
-VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 75000, 'DEMO-R-' || :cid);
+VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 75000, 'DEMO-R-' || :cid || '-' || :run);
 SELECT current_balance AS balance_inside_txn FROM customer WHERE customer_id = :cid;
 ROLLBACK;
 SELECT current_balance AS balance_after_rollback FROM customer WHERE customer_id = :cid;
@@ -24,11 +26,11 @@ SELECT current_balance AS balance_after_rollback FROM customer WHERE customer_id
 \echo '--- C) SAVEPOINT: first posting kept, second (overdraft) undone, whole unit still commits'
 BEGIN;
 INSERT INTO account_transaction (customer_id, txn_type, contribution_source, amount, reference)
-VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 10000, 'DEMO-S1-' || :cid);
+VALUES (:cid, 'CONTRIBUTION', 'VOLUNTARY', 10000, 'DEMO-S1-' || :cid || '-' || :run);
 SAVEPOINT before_withdrawal;
--- Overdraft attempt (a payment needs an originating benefit; use any PAID one for the demo reference)
 INSERT INTO account_transaction (customer_id, txn_type, amount, benefit_id, reference)
-SELECT :cid, 'PAYMENT', 999999999, benefit_id, 'DEMO-S2-' || :cid FROM benefit_application LIMIT 1;
+SELECT :cid, 'PAYMENT', 999999999, benefit_id, 'DEMO-S2-' || :cid || '-' || :run FROM benefit_application LIMIT 1;
+\echo '(overdraft error above is expected)'
 ROLLBACK TO SAVEPOINT before_withdrawal;
 SELECT current_balance AS balance_after_partial_rollback FROM customer WHERE customer_id = :cid;
 COMMIT;

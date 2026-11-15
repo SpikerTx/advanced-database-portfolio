@@ -1,26 +1,30 @@
---- Customer 1 opening balance 259895.35
+--- Customer 1 opening balance 219895.35
 --- A) COMMIT: post a voluntary contribution of 50,000
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:12: ERROR:  duplicate key value violates unique constraint "account_transaction_reference_key"
-DETAIL:  Key (reference)=(DEMO-C-1) already exists.
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:13: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ current_balance 
+-----------------
+       269895.35
+(1 row)
+
 --- B) ROLLBACK: post 75,000 then change our mind -> balance unchanged
  balance_inside_txn 
 --------------------
-          334895.35
+          344895.35
 (1 row)
 
  balance_after_rollback 
 ------------------------
-              259895.35
+              269895.35
 (1 row)
 
 --- C) SAVEPOINT: first posting kept, second (overdraft) undone, whole unit still commits
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:27: ERROR:  duplicate key value violates unique constraint "account_transaction_reference_key"
-DETAIL:  Key (reference)=(DEMO-S1-1) already exists.
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:28: ERROR:  current transaction is aborted, commands ignored until end of transaction block
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:31: ERROR:  current transaction is aborted, commands ignored until end of transaction block
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:32: ERROR:  savepoint "before_withdrawal" does not exist
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:33: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:32: ERROR:  Insufficient balance: requested 999999999.00, available 279895.35 (customer 1)
+CONTEXT:  PL/pgSQL function fn_post_transaction() line 22 at RAISE
+(overdraft error above is expected)
+ balance_after_partial_rollback 
+--------------------------------
+                      279895.35
+(1 row)
+
 --- D) Atomic benefit workflow: submit -> approve -> pay inside ONE transaction
  approve_benefit 
 -----------------
@@ -29,7 +33,7 @@ psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-conc
 
  payment_txn_id 
 ----------------
-         563229
+         563227
 (1 row)
 
  status | amount_approved 
@@ -38,21 +42,21 @@ psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-conc
 (1 row)
 
 --- E) Constraint failure aborts the whole transaction (negative balance impossible)
-psql:C:/users/francisu/advanced-database-portfolio/portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:46: ERROR:  Requested 999999999999 exceeds the permitted maximum 239895.35 for VOLUNTARY_WITHDRAWAL
+psql:portfolio-3-transactions-concurrency/sql/01_commit_rollback.sql:48: ERROR:  Requested 999999999999 exceeds the permitted maximum 259895.35 for VOLUNTARY_WITHDRAWAL
 CONTEXT:  PL/pgSQL function submit_benefit_application(bigint,benefit_type,numeric,character varying) line 6 at RAISE
 (error above is expected; the transaction is now in aborted state)
 --- Final ledger tail for the customer
  txn_id |   txn_type   | contribution_source |  amount  | balance_after 
 --------+--------------+---------------------+----------+---------------
- 563229 | PAYMENT      |                     | 20000.00 |     239895.35
- 563223 | PAYMENT      |                     | 20000.00 |     259895.35
- 563221 | CONTRIBUTION | VOLUNTARY           | 10000.00 |     279895.35
- 563219 | CONTRIBUTION | VOLUNTARY           | 50000.00 |     269895.35
+ 563227 | PAYMENT      |                     | 20000.00 |     259895.35
+ 563225 | CONTRIBUTION | VOLUNTARY           | 10000.00 |     279895.35
+ 563223 | CONTRIBUTION | VOLUNTARY           | 50000.00 |     269895.35
  526531 | CONTRIBUTION | EMPLOYER            | 24432.82 |     219895.35
+ 526530 | CONTRIBUTION | EMPLOYEE            | 19546.25 |     195462.53
 (5 rows)
 
  final_balance 
 ---------------
-     239895.35
+     259895.35
 (1 row)
 

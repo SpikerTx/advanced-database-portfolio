@@ -1,0 +1,35 @@
+# Builds the database from scratch on every push and runs the checks, giving automatic, timestamped evidence.
+name: build-and-verify
+on: [push, workflow_dispatch]
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: access_pensions
+      SEED_CUSTOMERS: "3000"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build database (schema, seed data, indexes, JSONB)
+        run: ./scripts/setup_local.sh
+      - name: Query benchmark (Portfolio 2)
+        run: ./portfolio-2-query-optimisation/run_benchmark.sh
+      - name: Transaction and concurrency demos (Portfolio 3)
+        run: ./portfolio-3-transactions-concurrency/run_all_demos.sh
+      - name: Partitioning / sharding demo (Portfolio 5)
+        run: psql -X -v ON_ERROR_STOP=1 -f portfolio-5-distributed-cloud/sql/01_partitioning_and_sharding.sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-logs
+          path: |
+            portfolio-2-query-optimisation/results/
+            portfolio-3-transactions-concurrency/results/

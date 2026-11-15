@@ -1,0 +1,285 @@
+
+=== 1. Customer by PIN ===
+{
+  _id: 'PEN100000000001',
+  name: {
+    surname: 'Abubakar',
+    firstName: 'Segun',
+    otherNames: 'Oluwaseun'
+  },
+  gender: 'M',
+  dateOfBirth: ISODate('1983-04-25T16:47:23.687Z'),
+  contact: {
+    phone: '08061007919',
+    email: 'segun.abubakar1@example.com'
+  },
+  accountCreatedOn: ISODate('2026-05-09T20:54:29.503Z'),
+  fund: {
+    code: 'RSA_II',
+    name: 'RSA Fund II'
+  },
+  employer: {
+    name: 'Bluewater Offshore Services Ltd',
+    sector: 'Oil & Gas'
+  },
+  bank: {
+    name: 'Guaranty Trust Bank',
+    accountNo: '1000007919'
+  },
+  denomination: 'NGN',
+  status: 'ACTIVE',
+  currentBalance: Decimal128('2046589.79'),
+  nextOfKin: [
+    {
+      fullName: 'Ngozi Abubakar',
+      relationship: 'Spouse',
+      phone: '08031000001',
+      sharePercent: 100
+    }
+  ],
+  recentTransactions: [
+    {
+      date: ISODate('2026-11-13T02:34:10.851Z'),
+      type: 'CONTRIBUTION',
+      source: 'EMPLOYEE',
+      amount: Decimal128('57165.91'),
+      balanceAfter: Decimal128('2046589.79')
+    },
+    {
+      date: ISODate('2026-10-14T02:34:10.854Z'),
+      type: 'CONTRIBUTION',
+      source: 'EMPLOYER',
+      amount: Decimal128('71457.39'),
+      balanceAfter: Decimal128('1917966.49')
+    },
+    {
+      date: ISODate('2026-09-14T02:34:10.854Z'),
+      type: 'CONTRIBUTION',
+      source: 'EMPLOYEE',
+      amount: Decimal128('57165.91'),
+      balanceAfter: Decimal128('1789343.18')
+    },
+    {
+      date: ISODate('2026-08-15T02:34:10.854Z'),
+      type: 'CONTRIBUTION',
+      source: 'EMPLOYER',
+      amount: Decimal128('71457.39'),
+      balanceAfter: Decimal128('1660719.87')
+    },
+    {
+      date: ISODate('2026-07-16T02:34:10.855Z'),
+      type: 'CONTRIBUTION',
+      source: 'EMPLOYEE',
+      amount: Decimal128('57165.91'),
+      balanceAfter: Decimal128('1532096.57')
+    }
+  ]
+}
+
+=== 2. Phone lookup (explain) ===
+{
+  executionSuccess: true,
+  nReturned: 1,
+  executionTimeMillis: 1,
+  totalKeysExamined: 1,
+  totalDocsExamined: 1,
+  executionStages: {
+    isCached: false,
+    stage: 'FETCH',
+    nReturned: 1,
+    executionTimeMillisEstimate: 0,
+    works: 2,
+    advanced: 1,
+    needTime: 0,
+    needYield: 0,
+    saveState: 0,
+    restoreState: 0,
+    isEOF: 1,
+    docsExamined: 1,
+    alreadyHasObj: 0,
+    inputStage: {
+      stage: 'IXSCAN',
+      nReturned: 1,
+      executionTimeMillisEstimate: 0,
+      works: 2,
+      advanced: 1,
+      needTime: 0,
+      needYield: 0,
+      saveState: 0,
+      restoreState: 0,
+      isEOF: 1,
+      keyPattern: {
+        'contact.phone': 1
+      },
+      indexName: 'contact.phone_1',
+      isMultiKey: false,
+      multiKeyPaths: {
+        'contact.phone': []
+      },
+      isUnique: false,
+      isSparse: false,
+      isPartial: false,
+      indexVersion: 2,
+      direction: 'forward',
+      indexBounds: {
+        'contact.phone': [
+          '["08061007919", "08061007919"]'
+        ]
+      },
+      keysExamined: 1,
+      seeks: 1,
+      dupsTested: 0,
+      dupsDropped: 0
+    }
+  }
+}
+
+=== 3. Balance by fund ===
+[
+  {
+    _id: 'Micro Pension Fund',
+    customers: 1111,
+    totalBalance: Decimal128('5041224985.30'),
+    avgBalance: Decimal128('4537556.242394239423942394239423942')
+  },
+  {
+    _id: 'RSA Fund I',
+    customers: 1088,
+    totalBalance: Decimal128('4979851391.85'),
+    avgBalance: Decimal128('4577069.293979779411764705882352941')
+  },
+  {
+    _id: 'RSA Fund III',
+    customers: 1110,
+    totalBalance: Decimal128('4904515606.53'),
+    avgBalance: Decimal128('4418482.528405405405405405405405405')
+  },
+  {
+    _id: 'RSA Fund II',
+    customers: 997,
+    totalBalance: Decimal128('4483198603.90'),
+    avgBalance: Decimal128('4496688.669909729187562688064192578')
+  },
+  {
+    _id: 'RSA Fund IV',
+    customers: 545,
+    totalBalance: Decimal128('2420323269.69'),
+    avgBalance: Decimal128('4440960.127871559633027522935779817')
+  }
+]
+
+=== 4. Top employers ===
+[
+  {
+    _id: 'Federal Works Directorate (Simulated)',
+    activeCustomers: 455
+  },
+  {
+    _id: 'Delta Grain Mills Ltd',
+    activeCustomers: 449
+  },
+  {
+    _id: 'Quest Software Systems Ltd',
+    activeCustomers: 440
+  },
+  {
+    _id: 'Vista Retail Stores Ltd',
+    activeCustomers: 439
+  },
+  {
+    _id: 'Kano Textile Works Ltd',
+    activeCustomers: 431
+  }
+]
+
+=== 5. Pending equity-mortgage applications by lender ===
+[
+  {
+    _id: 'Sterling Mortgage',
+    applications: 20,
+    requested: Decimal128('11748201.71')
+  },
+  {
+    _id: 'Federal Mortgage Bank',
+    applications: 9,
+    requested: Decimal128('7066168.85')
+  },
+  {
+    _id: 'Haven Housing Finance',
+    applications: 8,
+    requested: Decimal128('6906389.81')
+  }
+]
+
+=== 6. Pending applications with customer ===
+[
+  {
+    _id: ObjectId('6af91a3409cf049bc3c3a06b'),
+    type: 'LUMP_SUM_WITHDRAWAL',
+    amountRequested: Decimal128('4354252.80'),
+    customer: {
+      name: {
+        surname: 'Adeyemi',
+        firstName: 'Musa',
+        otherNames: 'Oluwaseun'
+      },
+      employer: {
+        name: 'Delta Grain Mills Ltd'
+      }
+    }
+  },
+  {
+    _id: ObjectId('6af91a3409cf049bc3c39f3a'),
+    type: 'LUMP_SUM_WITHDRAWAL',
+    amountRequested: Decimal128('287741.78'),
+    customer: {
+      name: {
+        surname: 'Danjuma',
+        firstName: 'Musa',
+        otherNames: null
+      },
+      employer: {
+        name: 'Vista Retail Stores Ltd'
+      }
+    }
+  },
+  {
+    _id: ObjectId('6af91a3409cf049bc3c3a023'),
+    type: 'LUMP_SUM_WITHDRAWAL',
+    amountRequested: Decimal128('6675974.52'),
+    customer: {
+      name: {
+        surname: 'Udoh',
+        firstName: 'Funke',
+        otherNames: 'Oluwaseun'
+      },
+      employer: {
+        name: 'Oriental Telecom Nigeria Ltd'
+      }
+    }
+  }
+]
+
+=== 7. Atomic contribution posting ===
+{
+  _id: 'PEN100000000002',
+  currentBalance: Decimal128('8730638.28'),
+  recentTransactions: [
+    {
+      date: ISODate('2026-11-15T02:45:46.539Z'),
+      type: 'CONTRIBUTION',
+      source: 'VOLUNTARY',
+      amount: Decimal128('50000.00'),
+      balanceAfter: Decimal128('0.00')
+    },
+    {
+      date: ISODate('2026-11-15T02:34:42.629Z'),
+      type: 'CONTRIBUTION',
+      source: 'VOLUNTARY',
+      amount: Decimal128('50000.00'),
+      balanceAfter: Decimal128('0.00')
+    }
+  ]
+}
+
+=== 8. Validation rejected the document as expected: undefined ===

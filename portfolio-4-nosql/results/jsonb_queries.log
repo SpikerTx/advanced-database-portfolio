@@ -1,0 +1,127 @@
+Pager usage is off.
+SET
+Pager usage is off.
+--- 1. One customer as a JSON document
+                      jsonb_pretty                       
+---------------------------------------------------------
+ {                                                      +
+     "_id": "PEN100000000001",                          +
+     "bank": {                                          +
+         "name": "Fidelity Bank",                       +
+         "accountNo": "2000007926"                      +
+     },                                                 +
+     "fund": {                                          +
+         "code": "RSA_I",                               +
+         "name": "RSA Fund I"                           +
+     },                                                 +
+     "name": {                                          +
+         "surname": "Okafor",                           +
+         "firstName": "Musa",                           +
+         "otherNames": "Olamide"                        +
+     },                                                 +
+     "status": "ACTIVE",                                +
+     "contact": {                                       +
+         "email": "musa.okafor1@outlook.com",           +
+         "phone": "08160007919"                         +
+     },                                                 +
+     "employer": {                                      +
+         "name": "Unity State Health Board (Simulated)",+
+         "sector": "Public Sector"                      +
+     },                                                 +
+     "nextOfKin": [                                     +
+         {                                              +
+             "fullName": "Tolu Okafor",                 +
+             "relationship": "Child",                   +
+             "sharePercent": 60.00                      +
+         },                                             +
+         {                                              +
+             "fullName": "Chidi Okafor",                +
+             "relationship": "Child",                   +
+             "sharePercent": 40.00                      +
+         }                                              +
+     ],                                                 +
+     "denomination": "NGN",                             +
+     "currentBalance": 219895.35,                       +
+     "recentTransactions": [                            +
+         {                                              +
+             "date": "2026-10-28",                      +
+             "type": "CONTRIBUTION",                    +
+             "amount": 24432.82,                        +
+             "balanceAfter": 219895.35                  +
+         },                                             +
+         {                                              +
+             "date": "2026-10-28",                      +
+             "type": "CONTRIBUTION",                    +
+             "amount": 19546.25,                        +
+             "balanceAfter": 195462.53                  +
+         },                                             +
+         {                                              +
+             "date": "2026-09-28",                      +
+             "type": "CONTRIBUTION",                    +
+             "amount": 24432.82,                        +
+             "balanceAfter": 175916.28                  +
+         },                                             +
+         {                                              +
+             "date": "2026-09-28",                      +
+             "type": "CONTRIBUTION",                    +
+             "amount": 19546.25,                        +
+             "balanceAfter": 151483.46                  +
+         },                                             +
+         {                                              +
+             "date": "2026-08-28",                      +
+             "type": "CONTRIBUTION",                    +
+             "amount": 24432.82,                        +
+             "balanceAfter": 131937.21                  +
+         }                                              +
+     ]                                                  +
+ }
+(1 row)
+
+--- 2. Containment (@>) uses the GIN index: equity-mortgage applications financed by one lender
+ benefit_id | status  | amount_requested |        lender         
+------------+---------+------------------+-----------------------
+        237 | PENDING |         31407.34 | Federal Mortgage Bank
+        450 | PENDING |        140706.80 | Federal Mortgage Bank
+        786 | PENDING |         64919.71 | Federal Mortgage Bank
+        864 | PENDING |        431646.73 | Federal Mortgage Bank
+        918 | PENDING |        717295.51 | Federal Mortgage Bank
+(5 rows)
+
+--- 3. Execution plan showing the GIN index (Bitmap Index Scan)
+                                               QUERY PLAN                                                
+---------------------------------------------------------------------------------------------------------
+ Aggregate (actual time=0.191..0.191 rows=1.00 loops=1)
+   Buffers: shared hit=52
+   ->  Bitmap Heap Scan on benefit_details (actual time=0.059..0.184 rows=114.00 loops=1)
+         Recheck Cond: (details @> '{"propertyState": "Lagos"}'::jsonb)
+         Heap Blocks: exact=49
+         Buffers: shared hit=52
+         ->  Bitmap Index Scan on idx_benefit_details_gin (actual time=0.042..0.042 rows=114.00 loops=1)
+               Index Cond: (details @> '{"propertyState": "Lagos"}'::jsonb)
+               Index Searches: 1
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=4
+ Planning Time: 0.124 ms
+ Execution Time: 0.213 ms
+(14 rows)
+
+--- 4. Path extraction + aggregation across document shapes
+  purpose  | count 
+-----------+-------
+ Business  |   109
+ Medical   |   108
+ Education |    96
+(3 rows)
+
+--- 5. Unnest an embedded array: death-benefit claimants and their shares
+ benefit_id |   claimant    | share_percent 
+------------+---------------+---------------
+          1 | Ngozi Onyeama |        100.00
+          6 | Ngozi Okonkwo |        100.00
+          8 | Bayo Afolabi  |        100.00
+          9 | Ngozi Umar    |        100.00
+         20 | Tolu Olawale  |        100.00
+         69 | Amaka Fashola |        100.00
+(6 rows)
+

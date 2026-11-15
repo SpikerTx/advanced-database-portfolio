@@ -1,0 +1,77 @@
+Pager usage is off.
+SET
+SET
+Pager usage is off.
+DROP SCHEMA
+CREATE SCHEMA
+CREATE TABLE
+DO
+CREATE TABLE
+INSERT 0 563218
+--- Rows per range partition
+       partition        | row_count 
+------------------------+-----------
+ ap_dist.txn_range_2024 |     24376
+ ap_dist.txn_range_2025 |    208224
+ ap_dist.txn_range_2026 |    330618
+(3 rows)
+
+--- Partition pruning: a one-month report touches ONE partition only
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   ->  Gather
+         Workers Planned: 2
+         ->  Partial Aggregate
+               ->  Parallel Seq Scan on txn_range_2026 txn_range
+                     Filter: ((txn_date >= '2026-09-01'::date) AND (txn_date < '2026-10-01'::date))
+(6 rows)
+
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 563218
+--- Shard balance: rows per "shard" (should be roughly even)
+        shard        | row_count | customers 
+---------------------+-----------+-----------
+ ap_dist.txn_shard_0 |    140848 |      4972
+ ap_dist.txn_shard_1 |    142251 |      5048
+ ap_dist.txn_shard_2 |    142559 |      5051
+ ap_dist.txn_shard_3 |    137560 |      4929
+(4 rows)
+
+--- Single-customer statement is routed to exactly ONE shard (shard-key lookup)
+                 QUERY PLAN                  
+---------------------------------------------
+ Bitmap Heap Scan on txn_shard_2 txn_shard
+   Recheck Cond: (customer_id = 1234)
+   ->  Bitmap Index Scan on txn_shard_2_pkey
+         Index Cond: (customer_id = 1234)
+(4 rows)
+
+--- Cross-shard query (no shard key): must visit ALL shards - the cost of sharding
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Group Key: txn_shard.txn_type
+   ->  Gather Merge
+         Workers Planned: 2
+         ->  Sort
+               Sort Key: txn_shard.txn_type
+               ->  Partial HashAggregate
+                     Group Key: txn_shard.txn_type
+                     ->  Parallel Append
+                           ->  Parallel Seq Scan on txn_shard_2 txn_shard_3
+                                 Filter: (txn_date >= '2026-09-01'::date)
+                           ->  Parallel Seq Scan on txn_shard_1 txn_shard_2
+                                 Filter: (txn_date >= '2026-09-01'::date)
+                           ->  Parallel Seq Scan on txn_shard_0 txn_shard_1
+                                 Filter: (txn_date >= '2026-09-01'::date)
+                           ->  Parallel Seq Scan on txn_shard_3 txn_shard_4
+                                 Filter: (txn_date >= '2026-09-01'::date)
+(17 rows)
+
+ANALYZE
+ANALYZE

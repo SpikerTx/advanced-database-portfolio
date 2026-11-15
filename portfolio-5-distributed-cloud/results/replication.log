@@ -1,0 +1,30 @@
+### 1. Primary: connected standbys (pg_stat_replication)
+ application_name |   state   | sync_state | replay_lag_bytes 
+------------------+-----------+------------+------------------
+ replica1         | streaming | async      |                0
+(1 row)
+
+### 2. Role check: primary should be 'f', replica should be 't' (pg_is_in_recovery)
+primary: f
+replica: t
+### 3. Write on PRIMARY, read the same row on REPLICA (read-your-writes after replication)
+primary sees:
+    reference    | amount  | balance_after 
+-----------------+---------+---------------
+ REPL-1794713717 | 1000.00 |    2434462.88
+(1 row)
+
+replica sees:
+    reference    | amount  | balance_after 
+-----------------+---------+---------------
+ REPL-1794713717 | 1000.00 |    2434462.88
+(1 row)
+
+### 4. Write on REPLICA must fail (read-only standby)
+ERROR:  cannot execute INSERT in a read-only transaction
+### 5. Replication delay observed on the replica
+  replay_delay   |  received  |  replayed  
+-----------------+------------+------------
+ 00:00:02.222674 | 0/350175B8 | 0/350175B8
+(1 row)
+

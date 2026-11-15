@@ -1,0 +1,74 @@
+# Access Pensions Limited - MIT 8103 portfolio stack
+#   docker compose up -d primary replica mongo      # PostgreSQL primary + streaming replica + MongoDB
+#   docker compose --profile mongo-rs up -d         # optional 3-node MongoDB replica set (then run portfolio-5.../scripts/init_mongo_replicaset.sh)
+# First start builds the database automatically from the SQL scripts in this repository.
+name: access-pensions
+
+services:
+  primary:
+    image: postgres:16
+    container_name: ap_primary
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ap_password}
+      POSTGRES_DB: ${POSTGRES_DB:-access_pensions}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl_password}
+      SEED_CUSTOMERS: ${SEED_CUSTOMERS:-20000}
+    command: >
+      postgres -c wal_level=replica -c max_wal_senders=10 -c wal_keep_size=512MB -c hot_standby=on
+    ports: ["5432:5432"]
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+      - ./:/repo:ro
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-access_pensions}"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  replica:
+    image: postgres:16
+    container_name: ap_replica
+    depends_on:
+      primary:
+        condition: service_healthy
+    user: postgres
+    environment:
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:-repl_password}
+      PGDATA: /var/lib/postgresql/data
+    entrypoint: ["/bin/bash", "/repo/docker/replica-entrypoint.sh"]
+    ports: ["5433:5432"]
+    volumes:
+      - replica_data:/var/lib/postgresql/data
+      - ./:/repo:ro
+
+  mongo:
+    image: mongo:7
+    container_name: ap_mongo
+    ports: ["27017:27017"]
+    volumes:
+      - mongo_data:/data/db
+      - ./portfolio-4-nosql/mongodb/init:/docker-entrypoint-initdb.d:ro
+      - ./portfolio-4-nosql/mongodb:/scripts:ro
+
+  # ---- optional: 3-node MongoDB replica set for the Portfolio 5 availability exercise ----
+  mongors1:
+    image: mongo:7
+    profiles: ["mongo-rs"]
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports: ["27018:27017"]
+  mongors2:
+    image: mongo:7
+    profiles: ["mongo-rs"]
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+  mongors3:
+    image: mongo:7
+    profiles: ["mongo-rs"]
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+
+volumes:
+  primary_data:
+  replica_data:
+  mongo_data:

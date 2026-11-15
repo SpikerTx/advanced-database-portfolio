@@ -1,0 +1,32 @@
+### 1. Primary: connected standbys (pg_stat_replication)
+ application_name | state | sync_state | replay_lag_bytes 
+------------------+-------+------------+------------------
+(0 rows)
+
+### 2. Role check: primary should be 'f', replica should be 't' (pg_is_in_recovery)
+primary: f
+replica: f
+### 3. Write on PRIMARY, read the same row on REPLICA (read-your-writes after replication)
+primary sees:
+    reference    | amount  | balance_after 
+-----------------+---------+---------------
+ REPL-1794714717 | 1000.00 |    2437462.88
+(1 row)
+
+replica sees:
+ reference | amount | balance_after 
+-----------+--------+---------------
+(0 rows)
+
+### 4. Write on REPLICA must fail (read-only standby)
+ERROR:  duplicate key value violates unique constraint "account_transaction_reference_key"
+DETAIL:  Key (reference)=(SHOULD-FAIL) already exists.
+### 5. Replication delay observed on the replica
+  replay_delay   |  received  |  replayed  
+-----------------+------------+------------
+ 00:02:28.964907 | 0/350270F8 | 0/350270F8
+(1 row)
+
+### 6. FAILOVER: promote the replica to primary
+replica is now in recovery? f
+Write accepted by the promoted node. Rebuild the old primary as a new replica before reuse.
